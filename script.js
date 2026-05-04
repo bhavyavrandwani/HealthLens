@@ -18,6 +18,9 @@ const refs = {
   reportInput: document.querySelector("#reportInput"),
   reportOutput: document.querySelector("#reportOutput"),
   reportConfidence: document.querySelector("#reportConfidence"),
+  reportUpload: document.querySelector("#reportUpload"),
+  reportUploadPreview: document.querySelector("#reportUploadPreview"),
+  readUploadedReport: document.querySelector("#readUploadedReport"),
   snapshot: document.querySelector("#snapshot"),
   age: document.querySelector("#age"),
   context: document.querySelector("#context"),
@@ -39,6 +42,7 @@ LDL 142 mg/dL
 TSH 5.8 mIU/L`;
 
 let uploadedPrescription = null;
+let uploadedReport = null;
 
 const reportRules = [
   { key: "hemoglobin", names: ["hemoglobin", "hb"], unit: "g/dL", low: 12, high: 16.5, plain: "oxygen-carrying blood protein" },
@@ -122,34 +126,56 @@ function setAiStatus(status, message) {
   `);
 }
 
-async function handlePrescriptionUpload() {
-  const file = refs.rxUpload.files[0];
-  uploadedPrescription = null;
+function setReportAiStatus(status, message) {
+  refs.reportConfidence.textContent = status;
+  setResults(refs.reportOutput, `
+    <article class="result-card warn">
+      <h3>${escapeHtml(status)}</h3>
+      <p>${escapeHtml(message)}</p>
+    </article>
+  `);
+}
+
+async function handleUpload(fileInput, preview, setUploaded) {
+  const file = fileInput.files[0];
+  setUploaded(null);
 
   if (!file) {
-    refs.uploadPreview.textContent = "No file selected";
+    preview.textContent = "No file selected";
     return;
   }
 
   if (file.size > 8 * 1024 * 1024) {
-    refs.rxUpload.value = "";
-    refs.uploadPreview.textContent = "Choose a file under 8 MB.";
+    fileInput.value = "";
+    preview.textContent = "Choose a file under 8 MB.";
     return;
   }
 
   const dataUrl = await readFileAsDataUrl(file);
-  uploadedPrescription = {
+  setUploaded({
     name: file.name,
     mimeType: file.type || "application/octet-stream",
     dataUrl
-  };
+  });
 
   if (file.type.startsWith("image/")) {
-    refs.uploadPreview.innerHTML = `<img src="${dataUrl}" alt="Uploaded prescription preview">`;
+    preview.innerHTML = `<img src="${dataUrl}" alt="Uploaded file preview">`;
     return;
   }
 
-  refs.uploadPreview.textContent = `${file.name} selected. ${file.type || "Unknown file type"}`;
+  preview.textContent = `${file.name} selected. ${file.type || "Unknown file type"}`;
+}
+
+async function handlePrescriptionUpload() {
+  await handleUpload(refs.rxUpload, refs.uploadPreview, (value) => {
+    uploadedPrescription = value;
+  });
+}
+
+async function handleReportUpload() {
+  await handleUpload(refs.reportUpload, refs.reportUploadPreview, (value) => {
+    uploadedReport = value;
+  });
 }
 
 async function readUploadedPrescriptionWithAi() {
@@ -199,6 +225,66 @@ async function readUploadedPrescriptionWithAi() {
   } finally {
     refs.readUploadedRx.disabled = false;
     refs.readUploadedRx.textContent = "Read uploaded prescription with AI";
+  }
+}
+
+function renderAiReportValues(values) {
+  if (!Array.isArray(values) || !values.length) return "";
+  return values.map((item) => {
+    const name = item.name || item.test || "Test";
+    const value = item.value ?? "";
+    const unit = item.unit || "";
+    return `${name} ${value} ${unit}`.trim();
+  }).join("\n");
+}
+
+async function readUploadedReportWithAi() {
+  const file = refs.reportUpload.files[0];
+  if (!file || !uploadedReport) {
+    setReportAiStatus("Upload needed", "Choose a diagnostic report image, PDF, or text file first.");
+    return;
+  }
+
+  refs.readUploadedReport.disabled = true;
+  refs.readUploadedReport.textContent = "Extracting...";
+  refs.reportConfidence.textContent = "AI reading";
+
+  try {
+    if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) {
+      refs.reportInput.value = await readFileAsText(file);
+      analyzeReport();
+      return;
+    }
+
+    const response = await fetch("/api/read-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(uploadedReport)
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "The AI report reader is not available.");
+    }
+
+    const extracted = payload.rawText || renderAiReportValues(payload.values);
+    refs.reportInput.value = extracted.trim();
+    analyzeReport();
+    refs.reportConfidence.textContent = payload.model ? `AI: ${payload.model}` : "AI read";
+
+    if (payload.summary || payload.warning) {
+      setResults(refs.reportOutput, refs.reportOutput.innerHTML + `
+        <article class="result-card warn">
+          <h3>AI reader note</h3>
+          <p>${escapeHtml([payload.summary, payload.warning].filter(Boolean).join(" "))}</p>
+        </article>
+      `);
+    }
+  } catch (error) {
+    setReportAiStatus("AI unavailable", `${error.message} Add OPENAI_API_KEY in Vercel to read uploaded report images or PDFs.`);
+  } finally {
+    refs.readUploadedReport.disabled = false;
+    refs.readUploadedReport.textContent = "Extract report values with AI";
   }
 }
 
@@ -498,8 +584,13 @@ document.querySelector("#loadSampleReport").addEventListener("click", () => {
   refs.reportInput.value = sampleReport;
   analyzeReport();
 });
+refs.reportUpload.addEventListener("change", handleReportUpload);
+refs.readUploadedReport.addEventListener("click", readUploadedReportWithAi);
 document.querySelector("#clearReport").addEventListener("click", () => {
   refs.reportInput.value = "";
+  refs.reportUpload.value = "";
+  uploadedReport = null;
+  refs.reportUploadPreview.textContent = "No file selected";
   analyzeReport();
 });
 document.querySelector("#analyzeReport").addEventListener("click", analyzeReport);

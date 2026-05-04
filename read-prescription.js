@@ -1,67 +1,10 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-
-const PORT = Number(process.env.PORT || 4173);
 const MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-const ROOT = __dirname;
 const MAX_BODY = 12 * 1024 * 1024;
-const readReportHandler = require("./api/read-report");
-
-const mimeTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".md": "text/markdown; charset=utf-8",
-  ".json": "application/json; charset=utf-8"
-};
 
 function sendJson(res, status, payload) {
-  const body = JSON.stringify(payload);
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body)
-  });
-  res.end(body);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > MAX_BODY) {
-        reject(new Error("Upload is too large. Use a file under 8 MB."));
-        req.destroy();
-      }
-    });
-    req.on("end", () => resolve(body));
-    req.on("error", reject);
-  });
-}
-
-function serveStatic(req, res) {
-  const urlPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
-  const safePath = path.normalize(urlPath === "/" ? "/index.html" : urlPath).replace(/^(\.\.[/\\])+/, "");
-  const filePath = path.join(ROOT, safePath);
-
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
-    res.end("Forbidden");
-    return;
-  }
-
-  fs.readFile(filePath, (error, data) => {
-    if (error) {
-      res.writeHead(404);
-      res.end("Not found");
-      return;
-    }
-
-    const type = mimeTypes[path.extname(filePath)] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": type });
-    res.end(data);
-  });
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
 }
 
 function extractJson(text) {
@@ -154,43 +97,27 @@ async function callPrescriptionModel(upload) {
   };
 }
 
-const server = http.createServer(async (req, res) => {
-  if (req.method === "POST" && req.url === "/api/read-report") {
-    try {
-      const body = await readBody(req);
-      req.body = JSON.parse(body);
-      await readReportHandler(req, res);
-    } catch (error) {
-      sendJson(res, error.statusCode || 500, { error: error.message || "Unable to read report." });
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    sendJson(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const size = Number(req.headers["content-length"] || 0);
+    if (size > MAX_BODY) {
+      sendJson(res, 413, { error: "Upload is too large. Use a file under 8 MB." });
+      return;
     }
-    return;
-  }
 
-  if (req.method === "POST" && req.url === "/api/read-prescription") {
-    try {
-      const body = await readBody(req);
-      const upload = JSON.parse(body);
-      if (!upload.name || !upload.mimeType || !upload.dataUrl) {
-        sendJson(res, 400, { error: "Missing upload data." });
-        return;
-      }
-      sendJson(res, 200, await callPrescriptionModel(upload));
-    } catch (error) {
-      sendJson(res, error.statusCode || 500, { error: error.message || "Unable to read prescription." });
+    const upload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    if (!upload?.name || !upload?.mimeType || !upload?.dataUrl) {
+      sendJson(res, 400, { error: "Missing upload data." });
+      return;
     }
-    return;
+
+    sendJson(res, 200, await callPrescriptionModel(upload));
+  } catch (error) {
+    sendJson(res, error.statusCode || 500, { error: error.message || "Unable to read prescription." });
   }
-
-  if (req.method === "GET" || req.method === "HEAD") {
-    serveStatic(req, res);
-    return;
-  }
-
-  res.writeHead(405);
-  res.end("Method not allowed");
-});
-
-server.listen(PORT, () => {
-  console.log(`HealthLabs running at http://localhost:${PORT}/`);
-  console.log(`AI document readers: ${process.env.OPENAI_API_KEY ? `enabled with ${MODEL}` : "set OPENAI_API_KEY to enable"}`);
-});
+};

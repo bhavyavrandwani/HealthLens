@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>HealthLens</title>
+    <title>HealthLabs</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body id="home">
     <header class="app-header">
-      <a class="brand-logo" href="index.html" aria-label="HealthLens home">
+      <a class="brand-logo" href="index.html" aria-label="HealthLabs home">
         <span class="brand-mark" aria-hidden="true">HL</span>
-        <span class="brand-name">HealthLens</span>
+        <span class="brand-name">HealthLabs</span>
       </a>
       <div>
-        <p class="eyebrow">HealthLens</p>
+        <p class="eyebrow">HealthLabs</p>
         <h1>Understand prescriptions, reports, and daily health signals.</h1>
       </div>
       <div class="status-strip" aria-label="Safety status">
@@ -100,6 +100,12 @@
               <div class="pane-heading">
                 <h2>Diagnostic report simplifier</h2>
                 <button id="loadSampleReport" type="button">Sample</button>
+              </div>
+              <div class="upload-box">
+                <label for="reportUpload">Upload diagnostic report</label>
+                <input id="reportUpload" type="file" accept="image/*,.pdf,.txt">
+                <div id="reportUploadPreview" class="upload-preview">No file selected</div>
+                <button id="readUploadedReport" type="button">Extract report values with AI</button>
               </div>
               <textarea id="reportInput" spellcheck="false" placeholder="Paste lab values, for example: Hemoglobin 10.8 g/dL, WBC 6200, Fasting glucose 132 mg/dL."></textarea>
               <div class="actions">

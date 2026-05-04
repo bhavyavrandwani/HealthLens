@@ -1,11 +1,12 @@
-# HealthLens
+# HealthLabs
 
-HealthLens is a static web prototype for helping users understand common health documents and readings in plain language.
+HealthLabs is a static web prototype for helping users understand common health documents and readings in plain language.
 
 ## What It Does
 
 - Uploads prescription images, PDFs, or text files.
 - Reads uploaded prescriptions with a vision-capable OpenAI model when the local Node server has `OPENAI_API_KEY` configured.
+- Uploads diagnostic report images, PDFs, or text files and extracts common values with AI on Vercel.
 - Interprets pasted prescription text into medicine, dose, frequency, timing, duration, and caution cards.
 - Simplifies common diagnostic report values such as hemoglobin, WBC, platelets, glucose, cholesterol, HDL, LDL, TSH, creatinine, and vitamin D.
 - Analyzes basic health indicators including heart rate, blood pressure, oxygen saturation, and temperature.
@@ -34,7 +35,7 @@ OPENAI_MODEL=gpt-4.1-mini OPENAI_API_KEY=your_key_here node server.js
 
 ## Deploy On Vercel
 
-This project is Vercel-ready. Static files are served from the project root, and the AI prescription reader is available as `api/read-prescription.js`.
+This project is Vercel-ready. Static files are served from the project root. AI readers are available as `api/read-prescription.js` and `api/read-report.js`.
 
 1. Push this folder to a GitHub repository.
 2. In Vercel, choose **Add New Project** and import that repository.
