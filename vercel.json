@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/read-prescription.js": {
+      "maxDuration": 30
+    }
+  }
+}
