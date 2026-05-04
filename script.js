@@ -58,7 +58,7 @@ const reportRules = [
 ];
 
 function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (char) => ({
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
@@ -83,6 +83,11 @@ function setEmpty(target, message) {
 function setResults(target, html) {
   target.className = "result-list";
   target.innerHTML = html;
+}
+
+function setBadge(badge, text, tone = "") {
+  badge.textContent = text;
+  badge.className = `badge ${tone}`.trim();
 }
 
 function readFileAsDataUrl(file) {
@@ -117,7 +122,7 @@ function renderAiMedicines(medicines) {
 }
 
 function setAiStatus(status, message) {
-  refs.rxConfidence.textContent = status;
+  setBadge(refs.rxConfidence, status, "warn");
   setResults(refs.rxOutput, `
     <article class="result-card warn">
       <h3>${escapeHtml(status)}</h3>
@@ -127,7 +132,7 @@ function setAiStatus(status, message) {
 }
 
 function setReportAiStatus(status, message) {
-  refs.reportConfidence.textContent = status;
+  setBadge(refs.reportConfidence, status, "warn");
   setResults(refs.reportOutput, `
     <article class="result-card warn">
       <h3>${escapeHtml(status)}</h3>
@@ -187,7 +192,7 @@ async function readUploadedPrescriptionWithAi() {
 
   refs.readUploadedRx.disabled = true;
   refs.readUploadedRx.textContent = "Reading...";
-  refs.rxConfidence.textContent = "AI reading";
+  setBadge(refs.rxConfidence, "AI reading", "warn");
 
   try {
     if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) {
@@ -210,7 +215,7 @@ async function readUploadedPrescriptionWithAi() {
     const extracted = payload.rawText || renderAiMedicines(payload.medicines);
     refs.rxInput.value = extracted.trim();
     analyzePrescription();
-    refs.rxConfidence.textContent = payload.model ? `AI: ${payload.model}` : "AI read";
+    setBadge(refs.rxConfidence, payload.model ? `AI: ${payload.model}` : "AI read", "good");
 
     if (payload.warning) {
       setResults(refs.rxOutput, refs.rxOutput.innerHTML + `
@@ -247,7 +252,7 @@ async function readUploadedReportWithAi() {
 
   refs.readUploadedReport.disabled = true;
   refs.readUploadedReport.textContent = "Extracting...";
-  refs.reportConfidence.textContent = "AI reading";
+  setBadge(refs.reportConfidence, "AI reading", "warn");
 
   try {
     if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) {
@@ -270,7 +275,7 @@ async function readUploadedReportWithAi() {
     const extracted = payload.rawText || renderAiReportValues(payload.values);
     refs.reportInput.value = extracted.trim();
     analyzeReport();
-    refs.reportConfidence.textContent = payload.model ? `AI: ${payload.model}` : "AI read";
+    setBadge(refs.reportConfidence, payload.model ? `AI: ${payload.model}` : "AI read", "good");
 
     if (payload.summary || payload.warning) {
       setResults(refs.reportOutput, refs.reportOutput.innerHTML + `
@@ -350,7 +355,7 @@ function analyzePrescription() {
   if (!refs.rxInput.value.trim()) {
     state.medicines = 0;
     state.rxPlain = "";
-    refs.rxConfidence.textContent = "No input";
+    setBadge(refs.rxConfidence, "No input");
     setEmpty(refs.rxOutput, "Paste prescription text to build a simple medication schedule.");
     updateSnapshot();
     return;
@@ -359,35 +364,79 @@ function analyzePrescription() {
   if (!medicines.length) {
     state.medicines = 0;
     state.rxPlain = "";
-    refs.rxConfidence.textContent = "Needs review";
+    setBadge(refs.rxConfidence, "Needs review", "warn");
     setEmpty(refs.rxOutput, "No medication pattern was detected. Try including medicine form, dose, timing, and duration.");
     updateSnapshot();
     return;
   }
 
   state.medicines = medicines.length;
-  refs.rxConfidence.textContent = `${medicines.length} detected`;
+  const incompleteCount = medicines.filter(isIncompleteMedicine).length;
+  setBadge(refs.rxConfidence, `${medicines.length} detected`, incompleteCount ? "warn" : "good");
   state.rxPlain = medicines.map((med, index) => (
     `${index + 1}. ${titleCase(med.name)}: ${med.dose}, ${med.frequency}, ${med.timing}, ${med.duration}. ${med.caution.join(" ")}`
   )).join("\n");
-  setResults(refs.rxOutput, medicines.map((med) => `
-    <article class="result-card ${med.dose.includes("not detected") || med.frequency.includes("not detected") || med.timing.includes("not detected") || med.duration.includes("not detected") ? "warn" : ""}">
-      <h3>${escapeHtml(titleCase(med.name))}</h3>
-      <p>${escapeHtml(med.dose)} - ${escapeHtml(med.frequency)} - ${escapeHtml(med.timing)} - ${escapeHtml(med.duration)}</p>
-      <div class="meta-row">
-        <span class="chip">Source checked</span>
-        <span class="chip">${escapeHtml(med.frequency)}</span>
-        <span class="chip">${escapeHtml(med.timing)}</span>
-      </div>
-      ${med.caution.length ? `<p class="advice">${escapeHtml(med.caution.join(" "))}</p>` : ""}
-    </article>
-  `).join("") + `
+  setResults(refs.rxOutput, renderMedicationSchedule(medicines) + renderDuplicateMedicineWarning(medicines) + `
     <article class="result-card warn">
       <h3>Before taking medicine</h3>
       <p>Confirm allergies, pregnancy status, kidney or liver disease, and interactions with a pharmacist or doctor. Do not stop or change doses based on this screen alone.</p>
     </article>
   `);
   updateSnapshot();
+}
+
+function isIncompleteMedicine(med) {
+  return med.dose.includes("not detected") || med.frequency.includes("not detected") || med.timing.includes("not detected") || med.duration.includes("not detected");
+}
+
+function scheduleBucket(med) {
+  const timing = med.timing.toLowerCase();
+  const frequency = med.frequency.toLowerCase();
+  if (timing.includes("morning") || timing.includes("before food")) return "Morning";
+  if (timing.includes("night") || timing.includes("bedtime")) return "Night";
+  if (frequency.includes("twice") || frequency.includes("three") || frequency.includes("four") || frequency.includes("every")) return "Multiple times";
+  if (frequency.includes("needed")) return "As needed";
+  return "Needs timing review";
+}
+
+function renderMedicationSchedule(medicines) {
+  const groups = medicines.reduce((acc, med) => {
+    const bucket = scheduleBucket(med);
+    acc[bucket] = acc[bucket] || [];
+    acc[bucket].push(med);
+    return acc;
+  }, {});
+
+  const order = ["Morning", "Multiple times", "Night", "As needed", "Needs timing review"];
+  return order.filter((bucket) => groups[bucket]).map((bucket) => `
+    <section class="schedule-group">
+      <h3>${escapeHtml(bucket)}</h3>
+      ${groups[bucket].map((med) => `
+        <div class="medicine-line">
+          <strong>${escapeHtml(titleCase(med.name))}</strong>
+          <span>${escapeHtml(med.dose)} - ${escapeHtml(med.frequency)} - ${escapeHtml(med.timing)} - ${escapeHtml(med.duration)}</span>
+          <div class="meta-row">
+            <span class="chip ${isIncompleteMedicine(med) ? "warn" : ""}">${isIncompleteMedicine(med) ? "Verify missing detail" : "Ready to verify"}</span>
+            <span class="chip">${escapeHtml(med.frequency)}</span>
+            <span class="chip">${escapeHtml(med.timing)}</span>
+          </div>
+          ${med.caution.length ? `<p class="advice">${escapeHtml(med.caution.join(" "))}</p>` : ""}
+        </div>
+      `).join("")}
+    </section>
+  `).join("");
+}
+
+function renderDuplicateMedicineWarning(medicines) {
+  const names = medicines.map((med) => titleCase(med.name));
+  const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+  if (!duplicates.length) return "";
+  return `
+    <article class="result-card danger">
+      <h3>Possible duplicate medicine</h3>
+      <p>${escapeHtml([...new Set(duplicates)].join(", "))} appears more than once. Verify this before taking anything.</p>
+    </article>
+  `;
 }
 
 function titleCase(value) {
@@ -432,7 +481,7 @@ function analyzeReport() {
   if (!text.trim()) {
     state.reportFlags = 0;
     state.reportPlain = "";
-    refs.reportConfidence.textContent = "No input";
+    setBadge(refs.reportConfidence, "No input");
     setEmpty(refs.reportOutput, "Paste diagnostic report values to see plain-language explanations.");
     updateSnapshot();
     return;
@@ -441,14 +490,14 @@ function analyzeReport() {
   if (!findings.length) {
     state.reportFlags = 0;
     state.reportPlain = "";
-    refs.reportConfidence.textContent = "Needs review";
+    setBadge(refs.reportConfidence, "Needs review", "warn");
     setEmpty(refs.reportOutput, "No supported values were detected. Include labels such as hemoglobin, glucose, HDL, LDL, TSH, WBC, or platelets.");
     updateSnapshot();
     return;
   }
 
   state.reportFlags = findings.filter((item) => item.status !== "normal").length;
-  refs.reportConfidence.textContent = `${findings.length} values found`;
+  setBadge(refs.reportConfidence, `${findings.length} values found`, state.reportFlags ? "warn" : "good");
   state.reportPlain = findings.map(({ rule, value, status }) => (
     `${titleCase(rule.key)}: ${value} ${rule.unit}. Status: ${status}. Usual range: ${rule.low}-${rule.high}.`
   )).join("\n");
@@ -522,7 +571,12 @@ function analyzeVitals() {
   const dangerCount = findings.filter((item) => item.severity === "danger").length;
   const warnCount = findings.filter((item) => item.severity === "warn").length;
   state.vitals = dangerCount ? "Urgent" : warnCount ? "Review" : "Stable";
-  refs.vitalsOutput.innerHTML = findings.map((item) => item.html).join("");
+  refs.vitalsOutput.innerHTML = `
+    <div class="vital-summary">
+      <strong>${escapeHtml(state.vitals)} vitals review</strong>
+      <p>${escapeHtml(dangerCount ? "One or more readings may need urgent attention." : warnCount ? "Some readings should be rechecked and discussed if repeated." : "Current values are within common ranges for many adults.")}</p>
+    </div>
+  ` + findings.map((item) => item.html).join("");
   updateSnapshot();
 }
 

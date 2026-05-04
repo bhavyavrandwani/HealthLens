@@ -8,9 +8,11 @@ HealthLabs is a static web prototype for helping users understand common health 
 - Reads uploaded prescriptions with a vision-capable OpenAI model when the local Node server has `OPENAI_API_KEY` configured.
 - Uploads diagnostic report images, PDFs, or text files and extracts common values with AI on Vercel.
 - Interprets pasted prescription text into medicine, dose, frequency, timing, duration, and caution cards.
+- Groups medicines into a simple daily schedule and highlights missing or duplicate details for verification.
 - Simplifies common diagnostic report values such as hemoglobin, WBC, platelets, glucose, cholesterol, HDL, LDL, TSH, creatinine, and vitamin D.
 - Analyzes basic health indicators including heart rate, blood pressure, oxygen saturation, and temperature.
 - Provides copyable plain-language summaries for medication plans and lab interpretations.
+- Includes privacy and safety notices around AI document reading.
 - Keeps safety boundaries visible: it supports understanding, but does not diagnose or change treatment.
 
 ## Run Locally

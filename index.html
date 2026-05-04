@@ -15,6 +15,7 @@
       <div>
         <p class="eyebrow">HealthLabs</p>
         <h1>Understand prescriptions, reports, and daily health signals.</h1>
+        <p class="hero-copy">Upload or paste medical documents, turn them into plain-language guidance, and keep the next step visible without replacing professional care.</p>
       </div>
       <div class="status-strip" aria-label="Safety status">
         <span class="status-dot"></span>
@@ -53,6 +54,11 @@
             <div><dt>Vitals</dt><dd>Waiting</dd></div>
           </dl>
         </section>
+
+        <section class="privacy-box">
+          <h2>Privacy note</h2>
+          <p>Files are read only when you click an AI button. Avoid uploading anything you do not want processed by the configured AI service.</p>
+        </section>
       </aside>
 
       <section class="workspace" aria-label="Health tools">
@@ -61,6 +67,18 @@
           <button class="tab" data-tab="reports" type="button">Reports</button>
           <button class="tab" data-tab="vitals" type="button">Vitals</button>
         </nav>
+
+        <div class="workspace-intro">
+          <div>
+            <h2>Guided review</h2>
+            <p>Use sample data, paste text, or upload a file. Unclear results are highlighted for clinician or pharmacist verification.</p>
+          </div>
+          <div class="intro-steps" aria-label="Workflow steps">
+            <span>Upload</span>
+            <span>Extract</span>
+            <span>Review</span>
+          </div>
+        </div>
 
         <section id="prescription" class="panel active">
           <div class="tool-grid">
@@ -73,6 +91,7 @@
                 <label for="rxUpload">Upload prescription</label>
                 <input id="rxUpload" type="file" accept="image/*,.pdf,.txt">
                 <div id="uploadPreview" class="upload-preview">No file selected</div>
+                <p class="helper-text">Best results come from bright, uncropped images where medicine names and dosage instructions are readable.</p>
                 <button id="readUploadedRx" type="button">Read uploaded prescription with AI</button>
               </div>
               <textarea id="rxInput" spellcheck="false" placeholder="Paste prescription text, for example: Tab Metformin 500 mg twice daily after food for 30 days."></textarea>
@@ -86,6 +105,10 @@
               <div class="pane-heading">
                 <h2>Medication plan</h2>
                 <span id="rxConfidence" class="badge">No input</span>
+              </div>
+              <div class="result-guide">
+                <strong>Review checklist</strong>
+                <span>Confirm dose, timing, duration, allergies, and duplicate medicines before following any plan.</span>
               </div>
               <div id="rxOutput" class="result-list empty-state">
                 Paste prescription text to build a simple medication schedule.
@@ -105,6 +128,7 @@
                 <label for="reportUpload">Upload diagnostic report</label>
                 <input id="reportUpload" type="file" accept="image/*,.pdf,.txt">
                 <div id="reportUploadPreview" class="upload-preview">No file selected</div>
+                <p class="helper-text">Upload a clear report page or paste values with labels such as hemoglobin, glucose, HDL, LDL, TSH, WBC, or platelets.</p>
                 <button id="readUploadedReport" type="button">Extract report values with AI</button>
               </div>
               <textarea id="reportInput" spellcheck="false" placeholder="Paste lab values, for example: Hemoglobin 10.8 g/dL, WBC 6200, Fasting glucose 132 mg/dL."></textarea>
@@ -118,6 +142,10 @@
               <div class="pane-heading">
                 <h2>Plain-language findings</h2>
                 <span id="reportConfidence" class="badge">No input</span>
+              </div>
+              <div class="result-guide">
+                <strong>Interpret carefully</strong>
+                <span>Reference ranges vary by lab, age, sex, pregnancy, medicines, and symptoms.</span>
               </div>
               <div id="reportOutput" class="result-list empty-state">
                 Paste diagnostic report values to see plain-language explanations.
